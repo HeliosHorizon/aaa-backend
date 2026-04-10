@@ -4,24 +4,25 @@ const transactionSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: "User" },
   projectId: { type: Schema.Types.ObjectId, ref: "Project" },
 
-  amount: Number,
-  category: String,
-  description: String,
+  name: String,
+address: String,
 
-  extraFields: Object,
+quantity: Number,
+particular: String,
+rate: Number,
+amount: Number,
 
-  type: {
+type: {
   type: String,
-  enum: ["income", "expense"]
+  enum: ["sell", "purchase"]
 },
 
-  source: {
-    type: String,
-    enum: ["text", "voice", "image"],
-    default: "text"
-  },
+date: {
+  type: Date,
+  default: Date.now
+},
 
-  syncedToZoho: { type: Boolean, default: false }
+syncedToZoho: { type: Boolean, default: false }
 
 }, { timestamps: true });
 
