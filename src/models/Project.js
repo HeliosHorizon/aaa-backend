@@ -7,7 +7,7 @@ const projectSchema = new Schema({
 
   fields: {
     type: [String],
-    default: ["amount", "category", "description"]
+    default: ["quantity", "rate", "amount","description"]
   }
 
 }, { timestamps: true });
