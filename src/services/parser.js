@@ -1,93 +1,67 @@
-// export function parseText(input) {
-//   const text = input.toLowerCase();
 
-//   // Extract amount
-//   const amountMatch = text.match(/\d+/);
-//   const amount = amountMatch ? Number(amountMatch[0]) : 0;
 
-//   // Detect type
-//   let type = "expense";
-//   if (text.includes("received") || text.includes("mila") || text.includes("aaya")) {
-//     type = "income";
-//   }
+function normalizeText(input) {
+  let text = input.toLowerCase();
 
-//   // Detect category
-//   let category = "other";
+  const replacements = {
+    "rupay": "rupees",
+    "rs": "rupees",
+    "₹": "rupees",
+    "diya": "paid",
+    "de diya": "paid",
+    "mila": "received",
+    "aaya": "received",
+    "liye": "for",
+    "liya": "bought",
+    "kharcha": "expense"
+  };
 
-//   if (text.includes("petrol") || text.includes("fuel")) category = "fuel";
-//   if (text.includes("rent") || text.includes("kiraya")) category = "rent";
-//   if (text.includes("food") || text.includes("khana")) category = "food";
+  Object.keys(replacements).forEach(key => {
+    text = text.replace(new RegExp(key, "g"), replacements[key]);
+  });
 
-//   return {
-//     amount,
-//     type,
-//     category,
-//     description: input
-//   };
-// }
+  return text;
+}
 
-// function normalizeText(input) {
-//   let text = input.toLowerCase();
+function detectType(text) {
+  const incomeKeywords = ["received", "got", "earned"];
+  const expenseKeywords = ["paid", "spent", "bought", "expense"];
 
-//   const replacements = {
-//     "rupay": "rupees",
-//     "rs": "rupees",
-//     "₹": "rupees",
-//     "diya": "paid",
-//     "de diya": "paid",
-//     "mila": "received",
-//     "aaya": "received",
-//     "liye": "for",
-//     "liya": "bought",
-//     "kharcha": "expense"
-//   };
+  if (incomeKeywords.some(k => text.includes(k))) return "income";
+  if (expenseKeywords.some(k => text.includes(k))) return "expense";
 
-//   Object.keys(replacements).forEach(key => {
-//     text = text.replace(new RegExp(key, "g"), replacements[key]);
-//   });
+  // 🔥 Heuristic fallback
+  if (text.includes("from")) return "income";
+  if (text.includes("to")) return "expense";
 
-//   return text;
-// }
+  return "expense"; // default
+}
 
-// function detectType(text) {
-//   const incomeKeywords = ["received", "got", "earned"];
-//   const expenseKeywords = ["paid", "spent", "bought", "expense"];
+function detectCategory(text) {
+  if (text.includes("petrol") || text.includes("fuel")) return "fuel";
+  if (text.includes("rent") || text.includes("kiraya")) return "rent";
+  if (text.includes("food") || text.includes("khana")) return "food";
+  if (text.includes("salary")) return "salary";
 
-//   if (incomeKeywords.some(k => text.includes(k))) return "income";
-//   if (expenseKeywords.some(k => text.includes(k))) return "expense";
+  return "other";
+}
 
-//   // 🔥 Heuristic fallback
-//   if (text.includes("from")) return "income";
-//   if (text.includes("to")) return "expense";
+export function parseText(input) {
+  const normalized = normalizeText(input);
 
-//   return "expense"; // default
-// }
+  const amountMatch = normalized.match(/\d+/);
+  const amount = amountMatch ? Number(amountMatch[0]) : 0;
 
-// function detectCategory(text) {
-//   if (text.includes("petrol") || text.includes("fuel")) return "fuel";
-//   if (text.includes("rent") || text.includes("kiraya")) return "rent";
-//   if (text.includes("food") || text.includes("khana")) return "food";
-//   if (text.includes("salary")) return "salary";
+  const type = detectType(normalized);
+  const category = detectCategory(normalized);
 
-//   return "other";
-// }
-
-// export function parseText(input) {
-//   const normalized = normalizeText(input);
-
-//   const amountMatch = normalized.match(/\d+/);
-//   const amount = amountMatch ? Number(amountMatch[0]) : 0;
-
-//   const type = detectType(normalized);
-//   const category = detectCategory(normalized);
-
-//   return {
-//     amount,
-//     type,
-//     category,
-//     description: input
-//   };
-// }
+  return {
+    amount,
+    type,
+    category,
+    description: input
+  };
+}
 export function parseProduct(input) {
   const text = input.toLowerCase();
 
@@ -111,8 +85,10 @@ export function parseProduct(input) {
   }
 
   // remove numbers to get particulars
-  let particular = text.replace(/\d+/g, "").trim();
-
+  let particular = text
+  .replace(/\b\d{3,4}\b/g, "") // remove large numbers (amount)
+  .replace(/\d+$/g, "") // remove ending numbers
+  .trim();
   // clean extra spaces
   particular = particular.replace(/\s+/g, " ");
 
