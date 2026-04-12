@@ -1,7 +1,11 @@
 import Transaction from "../models/Transection.js";
 import Project from "../models/Project.js";
-import { parseText, parseProduct } from "../services/parser.js";
+import { parseProduct } from "../services/parser.js";
 import User from "../models/User.js";
+
+import { extractTextFromImage } from "../services/ocr.js";
+import { extractFromImageWithAI } from "../services/aiVersion.js";
+
 
 // ADD TRANSACTION
 // export async function addTransaction(req, res) {
@@ -222,5 +226,121 @@ export async function saveTransaction(req, res) {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to save transaction" });
+  }
+}
+// ==========================
+// 📸 IMAGE → PREVIEW
+// ==========================
+// export async function previewFromImage(req, res) {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "Image is required" });
+//     }
+
+//     // 🧠 STEP 1: OCR
+//     const text = await extractTextFromImage(req.file.buffer);
+
+//     if (!text) {
+//       return res.status(500).json({ message: "OCR failed" });
+//     }
+
+//     // 🧠 STEP 2: CLEAN + SPLIT LINES
+//     const lines = text
+//       .split("\n")
+//       .map(l => l.trim())
+//       .filter(l => l.length > 0);
+
+//     let parsedRows = [];
+
+//     // 🧠 STEP 3: PARSE EACH LINE
+//     for (let line of lines) {
+//       const lower = line.toLowerCase();
+
+//       // ❌ skip unwanted lines
+//       if (
+//         lower.includes("total") ||
+//         lower.includes("balance") ||
+//         line.length < 3
+//       ) continue;
+
+//       const parsed = parseProduct(line);
+
+//       // ❌ skip useless parsed rows
+//       if (!parsed.amount && !parsed.quantity) continue;
+
+//       parsedRows.push({
+//         raw: line,
+//         ...parsed
+//       });
+//     }
+
+//     // 🧠 STEP 4: OPTIONAL NAME DETECTION (first line fallback)
+//     let detectedName = null;
+
+//     if (lines.length > 0) {
+//       const firstLine = lines[0];
+
+//       if (!firstLine.match(/\d/)) {
+//         detectedName = firstLine;
+//       }
+//     }
+
+//     return res.json({
+//       message: "OCR preview generated",
+//       rawText: text, // 🔥 useful for debugging
+//       detectedName,
+//       rows: parsedRows
+//     });
+
+//   } catch (error) {
+//     console.error("OCR PREVIEW ERROR:", error);
+//     res.status(500).json({ message: "Failed to process image" });
+//   }
+// }
+
+
+export async function previewFromImage(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Image is required" });
+    }
+
+    const userId = req.user.userId;
+
+    // 🔐 check usage limit
+    const user = await User.findById(userId);
+
+    if (user.usage.image >= user.limits.image) {
+      return res.status(400).json({
+        message: "Image AI limit reached"
+      });
+    }
+
+    // 🔥 convert image to base64
+    const base64Image = req.file.buffer.toString("base64");
+
+    // 🧠 AI extraction
+    const aiRows = await extractFromImageWithAI(base64Image);
+
+   if (!aiRows || !Array.isArray(aiRows) || aiRows.length === 0) {
+  return res.status(400).json({
+    message: "AI could not extract rows",
+    debug: aiRows
+  });
+}
+
+    // 📈 update usage
+    user.usage.image += 1;
+    await user.save();
+
+    return res.json({
+      message: "AI preview generated",
+      source: "ai",
+      rows: aiRows
+    });
+
+  } catch (error) {
+    console.error("AI PREVIEW ERROR:", error);
+    res.status(500).json({ message: "Failed to process image" });
   }
 }

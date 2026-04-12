@@ -1,5 +1,6 @@
-
-
+// ==========================
+// 🔧 NORMALIZE TEXT
+// ==========================
 function normalizeText(input) {
   let text = input.toLowerCase();
 
@@ -23,79 +24,82 @@ function normalizeText(input) {
   return text;
 }
 
-function detectType(text) {
-  const incomeKeywords = ["received", "got", "earned"];
-  const expenseKeywords = ["paid", "spent", "bought", "expense"];
-
-  if (incomeKeywords.some(k => text.includes(k))) return "income";
-  if (expenseKeywords.some(k => text.includes(k))) return "expense";
-
-  // 🔥 Heuristic fallback
-  if (text.includes("from")) return "income";
-  if (text.includes("to")) return "expense";
-
-  return "expense"; // default
+// ==========================
+// 🔢 EXTRACT NUMBERS (SMART)
+// ==========================
+function extractNumbers(text) {
+  // ignore numbers inside words like D421
+  const matches = text.match(/\b\d+\b/g);
+  return matches ? matches.map(Number) : [];
 }
 
-function detectCategory(text) {
-  if (text.includes("petrol") || text.includes("fuel")) return "fuel";
-  if (text.includes("rent") || text.includes("kiraya")) return "rent";
-  if (text.includes("food") || text.includes("khana")) return "food";
-  if (text.includes("salary")) return "salary";
-
-  return "other";
-}
-
-export function parseText(input) {
-  const normalized = normalizeText(input);
-
-  const amountMatch = normalized.match(/\d+/);
-  const amount = amountMatch ? Number(amountMatch[0]) : 0;
-
-  const type = detectType(normalized);
-  const category = detectCategory(normalized);
-
-  return {
-    amount,
-    type,
-    category,
-    description: input
-  };
-}
+// ==========================
+// 🧠 MAIN PRODUCT PARSER
+// ==========================
 export function parseProduct(input) {
-  const text = input.toLowerCase();
+  const normalized = normalizeText(input);
+  const text = normalized;
 
-  const numbers = text.match(/\d+/g)?.map(Number) || [];
+  const numbers = extractNumbers(text);
 
   let quantity = null;
   let rate = null;
   let amount = null;
 
-  if (numbers.length >= 3) {
-    // 🔥 take first as qty, last as amount, second last as rate
+  // ==========================
+  // 🧠 SMART NUMBER LOGIC
+  // ==========================
+  if (numbers.length >= 2) {
     quantity = numbers[0];
-    rate = numbers[numbers.length - 2];
-    amount = numbers[numbers.length - 1];
-  } else if (numbers.length === 2) {
-    quantity = numbers[0];
-    rate = numbers[1];
+    rate = numbers[numbers.length - 1];
+
+    // 🔥 ALWAYS calculate amount
     amount = quantity * rate;
-  } else if (numbers.length === 1) {
-    amount = numbers[0];
   }
 
-  // remove numbers to get particulars
-  let particular = text
-  .replace(/\b\d{3,4}\b/g, "") // remove large numbers (amount)
-  .replace(/\d+$/g, "") // remove ending numbers
-  .trim();
-  // clean extra spaces
+  // ==========================
+  // 🧾 CLEAN PARTICULAR
+  // ==========================
+  let particular = text;
+
+  // remove standalone numbers
+  particular = particular.replace(/\b\d+\b/g, "");
+
+  // remove common noise words
+  particular = particular
+    .replace(/rupees|each|total|for/g, "")
+    .trim();
+
+  // clean spacing
   particular = particular.replace(/\s+/g, " ");
+
+  // ==========================
+  // 🧠 OPTIONAL: AMOUNT VALIDATION
+  // ==========================
+  let detectedAmount = null;
+
+  if (numbers.length >= 3) {
+    detectedAmount = numbers[numbers.length - 1];
+  }
+
+  let warning = null;
+
+  if (detectedAmount && amount && detectedAmount !== amount) {
+    warning = "Amount mismatch detected";
+  }
 
   return {
     quantity,
     rate,
     amount,
-    particular
+    particular,
+
+    // optional meta
+    detectedAmount,
+    warning,
+
+    // user will fill
+    name: null,
+    address: null
   };
 }
